@@ -6,10 +6,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/robfig/cron/v3"
 	figure "github.com/common-nighthawk/go-figure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
+)
+
+// Dummy usage to keep dependencies as direct requires
+var (
+	_ = bubbletea.NewProgram(nil)
+	_ = cron.New()
+	_ = (*yaml.Node)(nil)
 )
 
 var styleVersion = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
