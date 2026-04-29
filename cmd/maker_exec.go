@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// RunCommand executes a saved command. liveOutput=true streams to terminal;
-// false captures output for the notification channel.
 func RunCommand(c *Command, liveOutput bool) error {
 	name := logName(c.Cmdlet, CommandSlug(c.Cmdlet, c.Command))
 	start := time.Now()
@@ -54,12 +52,19 @@ func RunCommand(c *Command, liveOutput bool) error {
 	return err
 }
 
-// RunChain executes chain steps in order. Stops on first error if StopOnError=true.
+func finalizeChain(chain *Chain, status string) {
+	now := time.Now()
+	chain.LastRun = &now
+	chain.LastStatus = status
+	SaveChain(chain)
+}
+
 func RunChain(chain *Chain, liveOutput bool) error {
 	chainLog := "chain-" + chain.Name
 	start := time.Now()
 	AppendLog(chainLog, "START", chain.Name, start)
 
+	hadError := false
 	for _, step := range chain.Steps {
 		parts := strings.SplitN(step.Command, "/", 2)
 		if len(parts) != 2 {
@@ -68,34 +73,30 @@ func RunChain(chain *Chain, liveOutput bool) error {
 		}
 		c, err := LoadCommand(parts[0], parts[1])
 		if err != nil {
-			msg := fmt.Sprintf("step %s not found: %v", step.Command, err)
-			AppendLog(chainLog, "ERROR", msg, time.Now())
+			AppendLog(chainLog, "ERROR", fmt.Sprintf("step %s not found: %v", step.Command, err), time.Now())
 			if chain.StopOnError {
-				chain.LastStatus = "failed"
-				now := time.Now()
-				chain.LastRun = &now
-				SaveChain(chain)
-				return fmt.Errorf("%s", msg)
+				finalizeChain(chain, "failed")
+				return fmt.Errorf("step %s not found: %w", step.Command, err)
 			}
+			hadError = true
 			continue
 		}
 		AppendLog(chainLog, "STEP", c.Command, time.Now())
 		if err := RunCommand(c, liveOutput); err != nil {
 			AppendLog(chainLog, "STEP FAILED", err.Error(), time.Now())
 			if chain.StopOnError {
-				chain.LastStatus = "failed"
-				now := time.Now()
-				chain.LastRun = &now
-				SaveChain(chain)
-				return err
+				finalizeChain(chain, "failed")
+				return fmt.Errorf("chain %s step %s: %w", chain.Name, step.Command, err)
 			}
+			hadError = true
 		}
 	}
 
-	now := time.Now()
-	chain.LastRun = &now
-	chain.LastStatus = "success"
-	SaveChain(chain)
-	AppendLog(chainLog, "SUCCESS", fmt.Sprintf("%.1fs", time.Since(start).Seconds()), time.Now())
+	finalStatus := "success"
+	if hadError {
+		finalStatus = "failed"
+	}
+	finalizeChain(chain, finalStatus)
+	AppendLog(chainLog, strings.ToUpper(finalStatus)+" ("+fmt.Sprintf("%.1fs", time.Since(start).Seconds())+")", "", time.Now())
 	return nil
 }
