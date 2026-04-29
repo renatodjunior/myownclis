@@ -32,7 +32,6 @@ func StartInSessionScheduler() {
 	for _, cmdlet := range cmdlets {
 		cmds, _ := ListCommands(cmdlet)
 		for _, c := range cmds {
-			c := c
 			if !c.Schedule.InSession || c.Schedule.Cron == "" {
 				continue
 			}
@@ -44,11 +43,14 @@ func StartInSessionScheduler() {
 					status = "failed"
 				}
 				lines, _ := TailLog(name, 5)
-				NotifyCh <- Notification{
+				select {
+				case NotifyCh <- Notification{
 					Name:   c.Cmdlet + " " + c.Command,
 					Output: strings.Join(lines, "\n"),
 					Status: status,
 					RunAt:  time.Now(),
+				}:
+				default:
 				}
 			})
 		}
@@ -56,7 +58,6 @@ func StartInSessionScheduler() {
 
 	chains, _ := ListChains()
 	for _, ch := range chains {
-		ch := ch
 		if !ch.Schedule.InSession || ch.Schedule.Cron == "" {
 			continue
 		}
@@ -67,11 +68,14 @@ func StartInSessionScheduler() {
 				status = "failed"
 			}
 			lines, _ := TailLog("chain-"+ch.Name, 5)
-			NotifyCh <- Notification{
+			select {
+			case NotifyCh <- Notification{
 				Name:   "chain:" + ch.Name,
 				Output: strings.Join(lines, "\n"),
 				Status: status,
 				RunAt:  time.Now(),
+			}:
+			default:
 			}
 		})
 	}
@@ -132,8 +136,9 @@ func cronToSchtasks(expr string) (schedule, interval, startTime string, approxim
 		return "MINUTE", "60", "", true
 	}
 	min, hour := fields[0], fields[1]
-	// daily at fixed time: "0 8 * * *"
-	if min != "*" && hour != "*" && !strings.Contains(min, "/") && !strings.Contains(hour, "/") {
+	// daily at fixed time: "0 8 * * *" — all of dom, month, dow must be wildcards
+	if min != "*" && hour != "*" && !strings.Contains(min, "/") && !strings.Contains(hour, "/") &&
+		fields[2] == "*" && fields[3] == "*" && fields[4] == "*" {
 		h, m := hour, min
 		if len(h) == 1 {
 			h = "0" + h
