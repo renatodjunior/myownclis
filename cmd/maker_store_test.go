@@ -100,7 +100,9 @@ func TestDeleteCommand(t *testing.T) {
 	mocDirOverride = dir
 	defer func() { mocDirOverride = origOverride }()
 
-	SaveCommand(&Command{Cmdlet: "git", Command: "git pull", Type: "shell", CreatedAt: time.Now(), LastStatus: "never"})
+	if err := SaveCommand(&Command{Cmdlet: "git", Command: "git pull", Type: "shell", CreatedAt: time.Now(), LastStatus: "never"}); err != nil {
+		t.Fatalf("SaveCommand setup: %v", err)
+	}
 	if err := DeleteCommand("git", "pull"); err != nil {
 		t.Fatalf("DeleteCommand: %v", err)
 	}
@@ -140,8 +142,12 @@ func TestBackupAndRestore(t *testing.T) {
 	mocDirOverride = dir
 	defer func() { mocDirOverride = origOverride }()
 
-	SaveCommand(&Command{Cmdlet: "git", Command: "git pull", Type: "shell", CreatedAt: time.Now(), LastStatus: "never"})
-	SaveChain(&Chain{Name: "deploy", StopOnError: true, CreatedAt: time.Now(), LastStatus: "never"})
+	if err := SaveCommand(&Command{Cmdlet: "git", Command: "git pull", Type: "shell", CreatedAt: time.Now(), LastStatus: "never"}); err != nil {
+		t.Fatalf("SaveCommand setup: %v", err)
+	}
+	if err := SaveChain(&Chain{Name: "deploy", StopOnError: true, CreatedAt: time.Now(), LastStatus: "never"}); err != nil {
+		t.Fatalf("SaveChain setup: %v", err)
+	}
 
 	destDir := t.TempDir()
 	backupFile := destDir + "/backup.yaml"

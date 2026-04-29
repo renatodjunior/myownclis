@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +23,10 @@ func mocDir() string {
 }
 
 func MocDir() string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(fmt.Sprintf("moc: cannot determine home directory: %v", err))
+	}
 	return filepath.Join(home, ".moc")
 }
 
@@ -106,7 +111,7 @@ type Chain struct {
 
 func SaveCommand(c *Command) error {
 	slug := CommandSlug(c.Cmdlet, c.Command)
-	path := filepath.Join(mocDir(), "commands", c.Cmdlet, slug+".yaml")
+	path := CommandPath(c.Cmdlet, slug)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
@@ -114,12 +119,20 @@ func SaveCommand(c *Command) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return yaml.NewEncoder(f).Encode(c)
+	enc := yaml.NewEncoder(f)
+	if err := enc.Encode(c); err != nil {
+		f.Close()
+		return err
+	}
+	if err := enc.Close(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func LoadCommand(cmdlet, slug string) (*Command, error) {
-	path := filepath.Join(mocDir(), "commands", cmdlet, slug+".yaml")
+	path := CommandPath(cmdlet, slug)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -135,7 +148,7 @@ func LoadCommand(cmdlet, slug string) (*Command, error) {
 func ListCmdlets() ([]string, error) {
 	base := filepath.Join(mocDir(), "commands")
 	entries, err := os.ReadDir(base)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -153,7 +166,7 @@ func ListCmdlets() ([]string, error) {
 func ListCommands(cmdlet string) ([]*Command, error) {
 	dir := filepath.Join(mocDir(), "commands", cmdlet)
 	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -188,8 +201,16 @@ func SaveChain(chain *Chain) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return yaml.NewEncoder(f).Encode(chain)
+	enc := yaml.NewEncoder(f)
+	if err := enc.Encode(chain); err != nil {
+		f.Close()
+		return err
+	}
+	if err := enc.Close(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func LoadChain(name string) (*Chain, error) {
@@ -209,7 +230,7 @@ func LoadChain(name string) (*Chain, error) {
 func ListChains() ([]*Chain, error) {
 	dir := filepath.Join(mocDir(), "chains")
 	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -241,12 +262,22 @@ type BackupFile struct {
 
 func Backup(destPath string) error {
 	var all BackupFile
-	cmdlets, _ := ListCmdlets()
+	cmdlets, err := ListCmdlets()
+	if err != nil {
+		return err
+	}
 	for _, cmdlet := range cmdlets {
-		cmds, _ := ListCommands(cmdlet)
+		cmds, err := ListCommands(cmdlet)
+		if err != nil {
+			return err
+		}
 		all.Commands = append(all.Commands, cmds...)
 	}
-	all.Chains, _ = ListChains()
+	chains, err := ListChains()
+	if err != nil {
+		return err
+	}
+	all.Chains = chains
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
 	}
@@ -254,8 +285,16 @@ func Backup(destPath string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return yaml.NewEncoder(f).Encode(all)
+	enc := yaml.NewEncoder(f)
+	if err := enc.Encode(all); err != nil {
+		f.Close()
+		return err
+	}
+	if err := enc.Close(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func Restore(srcPath string) error {
