@@ -40,7 +40,13 @@ func RotateLog(name string) error {
 	logDir := filepath.Join(mocDir(), "logs")
 	base := filepath.Join(logDir, name+".log")
 	info, err := os.Stat(base)
-	if err != nil || info.Size() < maxLogBytes {
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.Size() < maxLogBytes {
 		return nil
 	}
 	// shift: .log.3 deleted, .log.2→.log.3, .log.1→.log.2
@@ -48,7 +54,9 @@ func RotateLog(name string) error {
 	for i := maxRotations - 1; i >= 1; i-- {
 		src := filepath.Join(logDir, fmt.Sprintf("%s.log.%d", name, i))
 		dst := filepath.Join(logDir, fmt.Sprintf("%s.log.%d", name, i+1))
-		os.Rename(src, dst)
+		if err := os.Rename(src, dst); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 	if err := os.Rename(base, filepath.Join(logDir, name+".log.1")); err != nil {
 		return err
@@ -72,6 +80,9 @@ func CleanupLogs() {
 }
 
 func TailLog(name string, n int) ([]string, error) {
+	if n <= 0 {
+		return nil, nil
+	}
 	path := filepath.Join(mocDir(), "logs", name+".log")
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -85,6 +96,9 @@ func TailLog(name string, n int) ([]string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 	if len(lines) <= n {
 		return lines, nil
