@@ -32,6 +32,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(sfCmd)
+	rootCmd.AddCommand(makerCmd)
 }
 
 func printBanner() {
@@ -51,6 +52,31 @@ func printBanner() {
 
 func runMainShell() error {
 	printBanner()
+
+	CleanupLogs()
+	StartInSessionScheduler()
+	defer StopInSessionScheduler()
+
+	go func() {
+		for n := range NotifyCh {
+			icon := styleSuccess.Render("✓")
+			if n.Status == "failed" {
+				icon = styleError.Render("✗")
+			}
+			fmt.Printf("\n  %s %s [maker] %s — %s\n",
+				icon,
+				styleDim.Render(n.RunAt.Format("15:04:05")),
+				styleSuccess.Render(n.Name),
+				styleDim.Render(n.Status),
+			)
+			if trimmed := strings.TrimSpace(n.Output); trimmed != "" {
+				for _, line := range strings.Split(trimmed, "\n") {
+					fmt.Printf("    %s\n", styleDim.Render(line))
+				}
+			}
+			fmt.Print("moc ❯ ")
+		}
+	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
@@ -83,6 +109,17 @@ func runMainShell() error {
 					fmt.Println(styleError.Render("  Erro: " + err.Error()))
 				}
 			}
+		case "maker":
+			if len(sargs) == 0 {
+				if err := runMakerShell(); err != nil {
+					fmt.Println(styleError.Render("  Erro: " + err.Error()))
+				}
+			} else {
+				makerCmd.SetArgs(sargs)
+				if err := makerCmd.Execute(); err != nil {
+					fmt.Println(styleError.Render("  Erro: " + err.Error()))
+				}
+			}
 		default:
 			fmt.Printf("  %s %s\n  %s\n",
 				styleError.Render("Módulo desconhecido:"), styleVersion.Render(sub),
@@ -96,6 +133,7 @@ func runMainShell() error {
 func printMainHelp() {
 	modules := [][]string{
 		{"sf", "AWS Step Functions — browser, watch, tail, rerun e mais"},
+		{"maker", "Repositório de comandos — salva, agenda e encadeia CLIs"},
 	}
 	fmt.Println()
 	fmt.Printf("  %s\n\n", styleHeader.Render("MÓDULOS DISPONÍVEIS"))
