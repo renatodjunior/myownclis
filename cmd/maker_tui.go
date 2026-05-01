@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -29,13 +30,11 @@ type makerCmdletItem struct {
 	cmdCount int
 }
 
-func (i makerCmdletItem) Title() string       { return i.name }
-func (i makerCmdletItem) Description() string  { return fmt.Sprintf("%d commands", i.cmdCount) }
-func (i makerCmdletItem) FilterValue() string  { return i.name }
+func (i makerCmdletItem) Title() string      { return i.name }
+func (i makerCmdletItem) Description() string { return fmt.Sprintf("%d commands", i.cmdCount) }
+func (i makerCmdletItem) FilterValue() string { return i.name }
 
-type makerCommandItem struct {
-	cmd *Command
-}
+type makerCommandItem struct{ cmd *Command }
 
 func (i makerCommandItem) Title() string { return i.cmd.Command }
 func (i makerCommandItem) Description() string {
@@ -52,49 +51,74 @@ func (i makerCommandItem) FilterValue() string { return i.cmd.Command }
 
 // ── msg types ─────────────────────────────────────────────────────────────────
 
-type makerRefreshMsg struct{}
+type makerRefreshMsg struct{ logContent string }
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
 var (
+	// header bar
+	makerHdrBg = lipgloss.AdaptiveColor{Light: "57", Dark: "57"}
+
+	makerHeaderLogoStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("57")).
+				Foreground(lipgloss.Color("87")).
+				Bold(true).
+				Padding(0, 1)
+
+	makerHeaderCrumbStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("57")).
+				Foreground(lipgloss.Color("189")).
+				Padding(0, 1)
+
+	makerHeaderFillStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("57"))
+
+	makerHeaderStatsStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("57")).
+				Foreground(lipgloss.Color("189")).
+				Padding(0, 1)
+
+	// list title
 	makerListTitleStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("63")).
-				MarginLeft(2)
+				Foreground(lipgloss.Color("87")).
+				MarginLeft(1)
 
-	makerSelectedTitleStyle = lipgloss.NewStyle().
+	// delegate — no extra PaddingLeft; let delegate handle its own cursor indent
+	makerSelTitleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
+	makerSelDescStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	makerNormTitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	makerNormDescStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
+	// panel divider
+	makerDividerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("237"))
+
+	// preview panel text
+	makerPvTitleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("87")).
 				PaddingLeft(2).
-				Foreground(lipgloss.Color("111")).
-				Bold(true)
+				PaddingBottom(1)
 
-	makerSelectedDescStyle = lipgloss.NewStyle().
-				PaddingLeft(2).
-				Foreground(lipgloss.Color("240"))
+	makerPvKeyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("244")).
+			PaddingLeft(2)
 
-	makerNormalTitleStyle = lipgloss.NewStyle().
-				PaddingLeft(4).
-				Foreground(lipgloss.Color("252"))
+	makerPvValStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	makerPvOkStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("82"))
+	makerPvErrStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	makerPvDimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 
-	makerNormalDescStyle = lipgloss.NewStyle().
-				PaddingLeft(4).
-				Foreground(lipgloss.Color("240"))
-
-	makerStatusBarStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				PaddingLeft(2)
-
-	makerErrBarStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("196")).
-				PaddingLeft(2)
-
-	makerHintBarStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240")).
-				PaddingLeft(2)
-
-	makerPromptLabelStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("111")).
-				Bold(true)
+	// footer
+	makerStatusOkStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("82")).PaddingLeft(2)
+	makerStatusErrStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).PaddingLeft(2)
+	makerHintStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("237")).PaddingLeft(2)
+	makerPromptStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
 )
+
+// ── layout constants ──────────────────────────────────────────────────────────
+
+const makerListPct = 40 // percent of width for left panel
 
 // ── model ─────────────────────────────────────────────────────────────────────
 
@@ -105,6 +129,7 @@ type makerModel struct {
 	chains       []*Chain
 	commands     []*Command
 	list         list.Model
+	preview      viewport.Model
 	input        textinput.Model
 	statusMsg    string
 	isErr        bool
@@ -114,41 +139,57 @@ type makerModel struct {
 
 func newMakerModel() makerModel {
 	ti := textinput.New()
-	ti.Placeholder = "enter para executar · /add /del /log · exit"
+	ti.Placeholder = "/add  /del  /log  /help  exit"
 	ti.Focus()
 	ti.CharLimit = 256
 	ti.Width = 60
 
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles.SelectedTitle = makerSelectedTitleStyle
-	delegate.Styles.SelectedDesc  = makerSelectedDescStyle
-	delegate.Styles.NormalTitle   = makerNormalTitleStyle
-	delegate.Styles.NormalDesc    = makerNormalDescStyle
+	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = makerSelTitleStyle
+	d.Styles.SelectedDesc  = makerSelDescStyle
+	d.Styles.NormalTitle   = makerNormTitleStyle
+	d.Styles.NormalDesc    = makerNormDescStyle
 
-	l := list.New(nil, delegate, 80, 14)
-	l.Title = "MAKER"
+	l := list.New(nil, d, 32, 14)
+	l.Title = "CMDLETS"
 	l.Styles.Title = makerListTitleStyle
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowHelp(false)
 
+	vp := viewport.New(48, 14)
+	vp.Style = lipgloss.NewStyle().PaddingLeft(1)
+
 	m := makerModel{
-		view:   viewMakerHome,
-		list:   l,
-		input:  ti,
-		width:  80,
-		height: 24,
+		view:    viewMakerHome,
+		list:    l,
+		preview: vp,
+		input:   ti,
+		width:   80,
+		height:  24,
 	}
 	m.cmdlets, _ = ListCmdlets()
 	m.chains, _ = ListChains()
-	return m.withRefreshedList()
+	m = m.withRefreshedList()
+	m.preview.SetContent(m.previewContent())
+	return m
 }
 
-// withRefreshedList rebuilds list items from current model state.
+func (m makerModel) listW() int    { return m.width * makerListPct / 100 }
+func (m makerModel) previewW() int { return m.width - m.listW() - 1 }
+func (m makerModel) contentH() int {
+	h := m.height - 4 // header(1) + status(1) + input(1) + hint(1)
+	if h < 4 {
+		return 4
+	}
+	return h
+}
+
+// withRefreshedList rebuilds list items from current state.
 func (m makerModel) withRefreshedList() makerModel {
 	var items []list.Item
 	if m.view == viewMakerHome {
-		m.list.Title = "MAKER"
+		m.list.Title = "CMDLETS"
 		for _, name := range m.cmdlets {
 			cmds, _ := ListCommands(name)
 			items = append(items, makerCmdletItem{name: name, cmdCount: len(cmds)})
@@ -161,6 +202,199 @@ func (m makerModel) withRefreshedList() makerModel {
 	}
 	m.list.SetItems(items)
 	return m
+}
+
+// ── preview content generators ────────────────────────────────────────────────
+
+func (m makerModel) previewContent() string {
+	switch m.view {
+	case viewMakerHome:
+		ci, ok := m.list.SelectedItem().(makerCmdletItem)
+		if !ok {
+			return m.previewWelcome()
+		}
+		return m.previewCmdlet(ci.name)
+	case viewMakerCmdlet:
+		ci, ok := m.list.SelectedItem().(makerCommandItem)
+		if !ok {
+			return ""
+		}
+		return m.previewCommand(ci.cmd)
+	}
+	return ""
+}
+
+func (m makerModel) previewWelcome() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(makerPvDimStyle.Render("  ░▒▓ MAKER ▓▒░") + "\n\n")
+	b.WriteString(makerPvDimStyle.Render("  Repositório pessoal de comandos CLI.") + "\n\n")
+	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "cmdlets")) +
+		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.cmdlets))) + "\n")
+	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "chains")) +
+		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.chains))) + "\n\n")
+	b.WriteString(makerPvDimStyle.Render("  ↑↓ selecione um cmdlet para ver seus commands.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  /help para ver todos os comandos disponíveis.") + "\n")
+	return b.String()
+}
+
+func (m makerModel) previewCmdlet(name string) string {
+	var b strings.Builder
+	cmds, _ := ListCommands(name)
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  " + strings.ToUpper(name)) + "\n")
+
+	if len(cmds) == 0 {
+		b.WriteString(makerPvDimStyle.Render("  sem commands — use /add para adicionar") + "\n")
+		return b.String()
+	}
+	for _, c := range cmds {
+		icon := makerPvDimStyle.Render("—")
+		if c.LastStatus == "success" {
+			icon = makerPvOkStyle.Render("✓")
+		} else if c.LastStatus == "failed" {
+			icon = makerPvErrStyle.Render("✗")
+		}
+		lastRun := "never"
+		if c.LastRun != nil {
+			lastRun = c.LastRun.Format("02/01 15:04")
+		}
+		b.WriteString(fmt.Sprintf("  %s  %-36s  %s\n",
+			icon,
+			makerPvValStyle.Render(truncateMaker(c.Command, 36)),
+			makerPvDimStyle.Render(lastRun),
+		))
+	}
+
+	if len(m.chains) > 0 {
+		b.WriteString("\n")
+		b.WriteString(makerPvTitleStyle.Render("  CHAINS") + "\n")
+		for _, ch := range m.chains {
+			icon := makerPvDimStyle.Render("—")
+			if ch.LastStatus == "success" {
+				icon = makerPvOkStyle.Render("✓")
+			} else if ch.LastStatus == "failed" {
+				icon = makerPvErrStyle.Render("✗")
+			}
+			b.WriteString(fmt.Sprintf("  %s  %-24s  %s\n",
+				icon,
+				makerPvValStyle.Render(ch.Name),
+				makerPvDimStyle.Render(fmt.Sprintf("%d steps", len(ch.Steps))),
+			))
+		}
+	}
+	return b.String()
+}
+
+func (m makerModel) previewCommand(c *Command) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  "+truncateMaker(c.Command, 46)) + "\n")
+
+	rows := [][]string{
+		{"type", c.Type},
+		{"status", c.LastStatus},
+	}
+	if c.LastRun != nil {
+		rows = append(rows, []string{"last run", c.LastRun.Format("02/01/2006 15:04:05")})
+	}
+	if c.Workdir != "" {
+		rows = append(rows, []string{"workdir", truncateMaker(c.Workdir, 32)})
+	}
+	if c.Schedule.Cron != "" {
+		rows = append(rows, []string{"cron", c.Schedule.Cron})
+	}
+	for _, row := range rows {
+		b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", row[0])) +
+			makerPvValStyle.Render(row[1]) + "\n")
+	}
+
+	name := logName(c.Cmdlet, CommandSlug(c.Cmdlet, c.Command))
+	lines, _ := TailLog(name, 12)
+	if len(lines) > 0 {
+		b.WriteString("\n")
+		b.WriteString(makerPvTitleStyle.Render("  LOG") + "\n")
+		for _, l := range lines {
+			b.WriteString(makerPvDimStyle.Render("  "+truncateMaker(l, 46)) + "\n")
+		}
+	}
+	return b.String()
+}
+
+func (m makerModel) helpContent() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  COMANDOS") + "\n")
+	cmds := [][]string{
+		{"enter", "executar / navegar para cmdlet"},
+		{"esc", "voltar / limpar input"},
+		{"/add <cmd>", "salvar no cmdlet ativo"},
+		{"/add <c> <cmd>", "salvar em qualquer cmdlet"},
+		{"/del", "deletar command selecionado"},
+		{"/log", "log do command selecionado"},
+		{"/help", "esta ajuda"},
+		{"ls", "voltar para home"},
+		{"exit / q", "sair do maker"},
+	}
+	for _, row := range cmds {
+		b.WriteString(fmt.Sprintf("  %s  %s\n",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true).
+				Render(fmt.Sprintf("%-16s", row[0])),
+			makerPvDimStyle.Render(row[1]),
+		))
+	}
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  ATALHOS") + "\n")
+	shortcuts := [][]string{
+		{"↑↓", "navegar lista"},
+		{"PgUp/PgDn", "navegar rápido"},
+		{"ctrl+c", "sair imediatamente"},
+	}
+	for _, row := range shortcuts {
+		b.WriteString(fmt.Sprintf("  %s  %s\n",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true).
+				Render(fmt.Sprintf("%-16s", row[0])),
+			makerPvDimStyle.Render(row[1]),
+		))
+	}
+	return b.String()
+}
+
+func buildExecPreview(c *Command, lines []string) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  "+truncateMaker(c.Command, 46)) + "\n")
+	statusStyle := makerPvOkStyle
+	if c.LastStatus == "failed" {
+		statusStyle = makerPvErrStyle
+	}
+	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "resultado")) +
+		statusStyle.Render(c.LastStatus) + "\n")
+	if c.LastRun != nil {
+		b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "executado")) +
+			makerPvValStyle.Render(c.LastRun.Format("02/01 15:04:05")) + "\n")
+	}
+	if len(lines) == 0 {
+		b.WriteString("\n" + makerPvDimStyle.Render("  sem output registrado") + "\n")
+		return b.String()
+	}
+	b.WriteString("\n")
+	b.WriteString(makerPvTitleStyle.Render("  OUTPUT LOG") + "\n")
+	for _, l := range lines {
+		b.WriteString(makerPvDimStyle.Render("  "+truncateMaker(l, 46)) + "\n")
+	}
+	return b.String()
+}
+
+func truncateMaker(s string, max int) string {
+	if max <= 3 {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max-3]) + "..."
 }
 
 // ── lifecycle ─────────────────────────────────────────────────────────────────
@@ -179,12 +413,12 @@ func (m makerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		listH := msg.Height - 6
-		if listH < 4 {
-			listH = 4
-		}
-		m.list.SetSize(msg.Width-2, listH)
-		m.input.Width = msg.Width - 16
+		lw, pw, ch := m.listW(), m.previewW(), m.contentH()
+		m.list.SetSize(lw, ch)
+		m.preview.Width = pw
+		m.preview.Height = ch
+		m.input.Width = m.width - 18
+		m.preview.SetContent(m.previewContent())
 		return m, nil
 
 	case makerRefreshMsg:
@@ -193,7 +427,14 @@ func (m makerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.activeCmdlet != "" {
 			m.commands, _ = ListCommands(m.activeCmdlet)
 		}
-		return m.withRefreshedList(), nil
+		m = m.withRefreshedList()
+		if msg.logContent != "" {
+			m.preview.SetContent(msg.logContent)
+			m.preview.GotoTop()
+		} else {
+			m.preview.SetContent(m.previewContent())
+		}
+		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -213,7 +454,8 @@ func (m makerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.isErr = false
 				m.cmdlets, _ = ListCmdlets()
 				m.chains, _ = ListChains()
-				return m.withRefreshedList(), nil
+				m = m.withRefreshedList()
+				m.preview.SetContent(m.previewContent())
 			}
 			return m, nil
 
@@ -228,10 +470,12 @@ func (m makerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleListSelect()
 
 		case tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown:
-			// route to list when input is empty so arrows navigate items
+			// route to list when input is empty; preview follows selection
 			if m.input.Value() == "" {
 				var listCmd tea.Cmd
 				m.list, listCmd = m.list.Update(msg)
+				m.preview.SetContent(m.previewContent())
+				m.preview.GotoTop()
 				return m, listCmd
 			}
 		}
@@ -253,11 +497,17 @@ func (m makerModel) processCommand(input string) (tea.Model, tea.Cmd) {
 		m.commands = nil
 		m.cmdlets, _ = ListCmdlets()
 		m.chains, _ = ListChains()
-		return m.withRefreshedList(), nil
+		m = m.withRefreshedList()
+		m.preview.SetContent(m.previewContent())
+		return m, nil
 	case "/del", "del":
 		return m.doDel()
 	case "/log", "log":
 		return m.doLog()
+	case "/help", "help", "?":
+		m.preview.SetContent(m.helpContent())
+		m.preview.GotoTop()
+		return m, nil
 	}
 
 	if m.view == viewMakerHome {
@@ -301,7 +551,10 @@ func (m makerModel) navigateToCmdlet(name string) (makerModel, tea.Cmd) {
 	m.view = viewMakerCmdlet
 	m.activeCmdlet = name
 	m.commands, _ = ListCommands(name)
-	return m.withRefreshedList(), nil
+	m = m.withRefreshedList()
+	m.preview.SetContent(m.previewContent())
+	m.preview.GotoTop()
+	return m, nil
 }
 
 func (m makerModel) doRunCommand(c *Command) (makerModel, tea.Cmd) {
@@ -323,17 +576,16 @@ func (m makerModel) doRunCommand(c *Command) (makerModel, tea.Cmd) {
 		c.LastRun = &now
 		c.LastStatus = status
 		SaveCommand(c)
-		AppendLog(
-			logName(c.Cmdlet, CommandSlug(c.Cmdlet, c.Command)),
-			strings.ToUpper(status), "", time.Now(),
-		)
-		return makerRefreshMsg{}
+		logN := logName(c.Cmdlet, CommandSlug(c.Cmdlet, c.Command))
+		AppendLog(logN, strings.ToUpper(status), "", time.Now())
+		lines, _ := TailLog(logN, 20)
+		return makerRefreshMsg{logContent: buildExecPreview(c, lines)}
 	})
 }
 
 func (m makerModel) doDel() (makerModel, tea.Cmd) {
 	if m.view != viewMakerCmdlet {
-		m.statusMsg = "selecione um cmdlet primeiro (home → cmdlet)"
+		m.statusMsg = "entre em um cmdlet primeiro"
 		m.isErr = true
 		return m, nil
 	}
@@ -350,7 +602,9 @@ func (m makerModel) doDel() (makerModel, tea.Cmd) {
 	m.statusMsg = "deletado: " + ci.cmd.Command
 	m.commands, _ = ListCommands(m.activeCmdlet)
 	m.cmdlets, _ = ListCmdlets()
-	return m.withRefreshedList(), nil
+	m = m.withRefreshedList()
+	m.preview.SetContent(m.previewContent())
+	return m, nil
 }
 
 func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
@@ -375,7 +629,6 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 		command = strings.Join(parts[1:], " ")
 	}
 
-	// normalize: ensure command always starts with cmdlet
 	if !strings.HasPrefix(strings.ToLower(command), strings.ToLower(cmdlet)+" ") &&
 		!strings.EqualFold(command, cmdlet) {
 		command = cmdlet + " " + command
@@ -399,12 +652,14 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 	if m.activeCmdlet == cmdlet {
 		m.commands, _ = ListCommands(cmdlet)
 	}
-	return m.withRefreshedList(), nil
+	m = m.withRefreshedList()
+	m.preview.SetContent(m.previewContent())
+	return m, nil
 }
 
 func (m makerModel) doLog() (makerModel, tea.Cmd) {
 	if m.view != viewMakerCmdlet {
-		m.statusMsg = "selecione um cmdlet primeiro (home → cmdlet)"
+		m.statusMsg = "entre em um cmdlet primeiro"
 		m.isErr = true
 		return m, nil
 	}
@@ -413,49 +668,77 @@ func (m makerModel) doLog() (makerModel, tea.Cmd) {
 		return m, nil
 	}
 	name := logName(ci.cmd.Cmdlet, CommandSlug(ci.cmd.Cmdlet, ci.cmd.Command))
-	lines, _ := TailLog(name, 15)
-	if len(lines) == 0 {
-		m.statusMsg = "sem logs para " + ci.cmd.Command
-	} else {
-		m.statusMsg = strings.Join(lines, "\n")
-	}
+	lines, _ := TailLog(name, 20)
+	m.preview.SetContent(buildExecPreview(ci.cmd, lines))
+	m.preview.GotoTop()
 	return m, nil
 }
 
 // ── view ──────────────────────────────────────────────────────────────────────
 
 func (m makerModel) View() string {
-	var b strings.Builder
+	lw, pw, ch := m.listW(), m.previewW(), m.contentH()
 
-	b.WriteString(m.list.View())
-	b.WriteString("\n")
+	// ── header ───────────────────────────────────────────────────────────────
+	logo := "░▒▓ MAKER ▓▒░"
+	crumb := "home"
+	if m.activeCmdlet != "" {
+		crumb = "home › " + m.activeCmdlet
+	}
+	stats := fmt.Sprintf("cmdlets:%d  chains:%d", len(m.cmdlets), len(m.chains))
 
+	hLeft := makerHeaderLogoStyle.Render(logo) + makerHeaderCrumbStyle.Render("· "+crumb)
+	hRight := makerHeaderStatsStyle.Render(stats)
+	hPad := m.width - lipgloss.Width(hLeft) - lipgloss.Width(hRight)
+	if hPad < 0 {
+		hPad = 0
+	}
+	header := hLeft + makerHeaderFillStyle.Width(hPad).Render("") + hRight
+
+	// ── panels ────────────────────────────────────────────────────────────────
+	// resize for this frame (safe since View() gets a value copy)
+	m.list.SetSize(lw, ch)
+	m.preview.Width = pw - 2
+	m.preview.Height = ch
+
+	divLines := strings.Repeat("│\n", ch-1) + "│"
+	divider := makerDividerStyle.Render(divLines)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top,
+		lipgloss.NewStyle().Width(lw).Height(ch).Render(m.list.View()),
+		divider,
+		lipgloss.NewStyle().Width(pw).Height(ch).Render(m.preview.View()),
+	)
+
+	// ── status (always 1 line) ────────────────────────────────────────────────
+	statusLine := " "
 	if m.statusMsg != "" {
-		style := makerStatusBarStyle
+		st := makerStatusOkStyle
 		if m.isErr {
-			style = makerErrBarStyle
+			st = makerStatusErrStyle
 		}
-		for _, line := range strings.Split(m.statusMsg, "\n") {
-			b.WriteString(style.Render(line) + "\n")
-		}
+		statusLine = st.Render(m.statusMsg)
 	}
 
+	// ── input ─────────────────────────────────────────────────────────────────
 	prompt := "maker"
 	if m.activeCmdlet != "" {
-		prompt = "maker [" + m.activeCmdlet + "]"
+		prompt = "maker › " + m.activeCmdlet
 	}
-	b.WriteString(fmt.Sprintf("  %s %s\n",
-		makerPromptLabelStyle.Render(prompt+" ❯"),
+	inputLine := fmt.Sprintf("  %s %s",
+		makerPromptStyle.Render(prompt+" ❯"),
 		m.input.View(),
-	))
+	)
 
+	// ── hints ─────────────────────────────────────────────────────────────────
+	var hintLine string
 	if m.view == viewMakerHome {
-		b.WriteString(makerHintBarStyle.Render("↑↓ navegar · enter selecionar · /add <cmdlet> <cmd> · exit"))
+		hintLine = makerHintStyle.Render("↑↓ nav  enter selecionar  /add <cmdlet> <cmd>  /help  exit")
 	} else {
-		b.WriteString(makerHintBarStyle.Render("↑↓ navegar · enter executar · /del · /log · /add <cmd> · esc voltar"))
+		hintLine = makerHintStyle.Render("↑↓ nav  enter executar  /del  /log  /add <cmd>  /help  esc voltar")
 	}
 
-	return b.String()
+	return strings.Join([]string{header, body, statusLine, inputLine, hintLine}, "\n")
 }
 
 // runMakerShell launches the bubbletea TUI.
