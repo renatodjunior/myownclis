@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -326,11 +325,6 @@ func runMakerSaveAndExec(args []string) error {
 	return RunCommand(c, true)
 }
 
-func runMakerShell() error {
-	p := tea.NewProgram(newMakerModel(), tea.WithAltScreen())
-	_, err := p.Run()
-	return err
-}
 
 // ── init ──────────────────────────────────────────────────────────────────────
 
