@@ -282,7 +282,15 @@ func runMakerSaveAndExec(args []string) error {
 		return fmt.Errorf("uso: moc maker <cmdlet> <command>")
 	}
 	cmdlet := args[0]
-	command := strings.Join(args[1:], " ")
+	rest := strings.Join(args[1:], " ")
+	// normalize: ensure command always starts with cmdlet so "git status" and
+	// passing ["git","status"] both resolve to the same stored entry.
+	var command string
+	if strings.HasPrefix(strings.ToLower(rest), strings.ToLower(cmdlet)+" ") || strings.EqualFold(rest, cmdlet) {
+		command = rest
+	} else {
+		command = cmdlet + " " + rest
+	}
 	slug := CommandSlug(cmdlet, command)
 
 	existing, _ := LoadCommand(cmdlet, slug)
