@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -317,8 +318,11 @@ func runMakerSaveAndExec(args []string) error {
 	return RunCommand(c, true)
 }
 
-// runMakerShell is replaced with the bubbletea TUI in maker_tui.go (Task 9).
-func runMakerShell() error { return nil }
+func runMakerShell() error {
+	p := tea.NewProgram(newMakerModel(), tea.WithAltScreen())
+	_, err := p.Run()
+	return err
+}
 
 // ── init ──────────────────────────────────────────────────────────────────────
 
