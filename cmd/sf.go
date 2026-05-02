@@ -594,7 +594,7 @@ func runTail(cmd *cobra.Command, args []string) error {
 	}
 }
 
-// ── shell interativo com contexto de sessão ───────────────────────────────────
+// ── shell interativo (bubbletea TUI) ──────────────────────────────────────────
 
 func runSFShell() error {
 	ctx := context.Background()
@@ -602,149 +602,7 @@ func runSFShell() error {
 	if err != nil {
 		return err
 	}
-
-	sess := &shellSession{client: client, ctx: ctx}
-
-	fmt.Println()
-	fmt.Println(styleBanner.Render("  moc sf — Step Functions Shell  "))
-	fmt.Printf("\n  %s\n\n", styleDim.Render("'ls' para selecionar machine · 'help' para comandos · 'exit' para sair"))
-
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		fmt.Print(sess.prompt())
-		if !scanner.Scan() {
-			break
-		}
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		sub := parts[0]
-		sargs := parts[1:]
-
-		switch sub {
-		case "exit", "quit", "q":
-			fmt.Printf("\n  %s\n\n", styleDim.Render("Saindo..."))
-			return nil
-
-		case "help", "?":
-			printSFHelp()
-
-		// ── seleção de machine ──────────────────────────────────────────
-		case "ls", "list", "use":
-			if sub == "use" && len(sargs) > 0 {
-				// use <partial-name> — seta direto se nome bater
-				chosen, err := resolvePartial(sess, strings.Join(sargs, " "))
-				if err != nil {
-					fmt.Println(styleError.Render("  " + err.Error()))
-					continue
-				}
-				sess.machine = chosen
-				fmt.Printf("  %s %s\n", styleSuccess.Render("✓ Machine selecionada:"), styleSuccess.Render(sess.machineName()))
-			} else {
-				chosen, err := runMachinePicker(sess)
-				if err != nil {
-					fmt.Println(styleError.Render("  Erro: " + err.Error()))
-					continue
-				}
-				if chosen != nil {
-					sess.machine = chosen
-					fmt.Printf("\n  %s %s\n\n", styleSuccess.Render("✓ Selecionada:"), styleSuccess.Render(sess.machineName()))
-				}
-			}
-
-		case "clear", "unuse":
-			sess.machine = nil
-			fmt.Println(styleDim.Render("  Machine desmarcada."))
-
-		// ── comandos que usam contexto ──────────────────────────────────
-		case "executions", "ex", "exec":
-			arn, name, ok := sessArg(sess, sargs, "executions")
-			if !ok {
-				continue
-			}
-			execs, err := fetchExecutions(sess.ctx, sess.client, arn, maxResults, statusFilter)
-			if err != nil {
-				fmt.Println(styleError.Render("  Erro: " + err.Error()))
-				continue
-			}
-			fmt.Printf("\n  %s\n", styleDim.Render("Machine: "+name))
-			printExecutionsTable(execs)
-
-		case "status", "s":
-			arn, name, ok := sessArg(sess, sargs, "status")
-			if !ok {
-				continue
-			}
-			runStatusDirect(sess.ctx, sess.client, arn, name)
-
-		case "watch", "w", "dash", "d":
-			filterArn := ""
-			filterName := ""
-			if sess.machine != nil {
-				filterArn = sess.machineArn()
-				filterName = sess.machineName()
-			}
-			runWatchWithContext(sargs, filterArn, filterName)
-
-		case "executions-pick", "ep":
-			// lista execuções e deixa escolher uma para ação
-			arn, name, ok := sessArg(sess, sargs, "ep")
-			if !ok {
-				continue
-			}
-			execSessionPick(sess, arn, name, scanner)
-
-		// tail: se tiver machine, abre picker de execuções
-		case "tail", "t", "follow", "f":
-			if len(sargs) > 0 {
-				runTail(nil, sargs[:1])
-			} else if sess.machine != nil {
-				execSessionPick(sess, sess.machineArn(), sess.machineName(), scanner)
-			} else {
-				fmt.Println(styleError.Render("  Uso: tail <arn>  ou  selecione machine com 'ls' primeiro"))
-			}
-
-		case "history", "h", "hist":
-			if len(sargs) < 1 {
-				fmt.Println(styleError.Render("  Uso: history <arn>"))
-				continue
-			}
-			runHistory(nil, sargs[:1])
-
-		case "input", "in":
-			if len(sargs) < 1 {
-				fmt.Println(styleError.Render("  Uso: input <arn>"))
-				continue
-			}
-			runInput(nil, sargs[:1])
-
-		case "start", "st", "run":
-			arn, _, ok := sessArg(sess, sargs, "start")
-			if !ok {
-				continue
-			}
-			if len(sargs) >= 1 {
-				inputJSON = ""
-			}
-			runStart(nil, []string{arn})
-
-		case "rerun", "rr", "retry":
-			if len(sargs) < 1 {
-				fmt.Println(styleError.Render("  Uso: rerun <execution-arn>"))
-				continue
-			}
-			runRerun(nil, sargs[:1])
-
-		default:
-			fmt.Printf("  %s %s\n  %s\n",
-				styleError.Render("Desconhecido:"), styleDim.Render(sub),
-				styleDim.Render("Digite 'help' para ver comandos"),
-			)
-		}
-	}
-	return nil
+	return runSFShellTUI(client, ctx)
 }
 
 // sessArg retorna ARN da machine: prioriza sargs[0], fallback pra sess.machine

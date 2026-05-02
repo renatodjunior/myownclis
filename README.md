@@ -33,15 +33,13 @@ It runs as a one-shot command (`moc sf list`) **or** as an interactive shell
 
 ## Screenshots
 
-> Drop your own captures into `docs/screenshots/` and they will render here.
-
-| Main shell | Maker mode |
+| Main shell | Main shell — modules |
 |---|---|
-| ![main shell](docs/screenshots/main-shell.png) | ![maker mode](docs/screenshots/maker-mode.png) |
+| ![moc main](docs/screenshots/MOC%201.png) | ![moc help](docs/screenshots/MOC%201.1.png) |
 
-| Step Functions browser | Maker — command preview |
-|---|---|
-| ![sf browser](docs/screenshots/sf-browser.png) | ![maker preview](docs/screenshots/maker-preview.png) |
+| Maker mode |
+|---|
+| ![maker mode](docs/screenshots/MOC%202.png) |
 
 ## Install
 
