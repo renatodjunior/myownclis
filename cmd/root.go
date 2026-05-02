@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	figure "github.com/common-nighthawk/go-figure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,9 +35,8 @@ func init() {
 }
 
 func printBanner() {
-	fig := figure.NewColorFigure("MyOwnCLI", "big", "cyan", true)
-	fig.Print()
 	fmt.Println()
+	fmt.Print(RenderLogo())
 
 	r := viper.GetString("region")
 	p := viper.GetString("profile")
@@ -46,8 +44,8 @@ func printBanner() {
 	if p != "" {
 		configInfo += " · " + p
 	}
-	fmt.Printf("  %s\n", styleVersion.Render("v0.1.0 — "+configInfo))
-	fmt.Printf("  %s\n\n", styleTip.Render("'help' para módulos · 'exit' para sair"))
+	fmt.Printf("\n%s\n", styleVersion.Render("  my own cli · v0.1.0 · "+configInfo))
+	fmt.Printf("%s\n\n", styleTip.Render("  'help' para módulos · 'exit' para sair"))
 }
 
 func runMainShell() error {

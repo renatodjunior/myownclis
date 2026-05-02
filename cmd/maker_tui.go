@@ -56,27 +56,17 @@ type makerRefreshMsg struct{ logContent string }
 // ── styles ────────────────────────────────────────────────────────────────────
 
 var (
-	// header bar
-	makerHdrBg = lipgloss.AdaptiveColor{Light: "57", Dark: "57"}
+	// header meta (right of logo)
+	makerHdrLabelStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("244")).
+				Italic(true)
 
-	makerHeaderLogoStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("57")).
+	makerHdrCrumbStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("87")).
-				Bold(true).
-				Padding(0, 1)
+				Bold(true)
 
-	makerHeaderCrumbStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("57")).
-				Foreground(lipgloss.Color("189")).
-				Padding(0, 1)
-
-	makerHeaderFillStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("57"))
-
-	makerHeaderStatsStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("57")).
-				Foreground(lipgloss.Color("189")).
-				Padding(0, 1)
+	makerHdrStatsStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("241"))
 
 	// list title
 	makerListTitleStyle = lipgloss.NewStyle().
@@ -178,7 +168,8 @@ func newMakerModel() makerModel {
 func (m makerModel) listW() int    { return m.width * makerListPct / 100 }
 func (m makerModel) previewW() int { return m.width - m.listW() - 1 }
 func (m makerModel) contentH() int {
-	h := m.height - 4 // header(1) + status(1) + input(1) + hint(1)
+	// logo(6) + separator(1) + status(1) + input(1) + hint(1) = 10
+	h := m.height - 10
 	if h < 4 {
 		return 4
 	}
@@ -227,7 +218,7 @@ func (m makerModel) previewContent() string {
 func (m makerModel) previewWelcome() string {
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(makerPvDimStyle.Render("  ░▒▓ MAKER ▓▒░") + "\n\n")
+	b.WriteString(makerPvTitleStyle.Render("  WELCOME") + "\n")
 	b.WriteString(makerPvDimStyle.Render("  Repositório pessoal de comandos CLI.") + "\n\n")
 	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "cmdlets")) +
 		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.cmdlets))) + "\n")
@@ -679,21 +670,35 @@ func (m makerModel) doLog() (makerModel, tea.Cmd) {
 func (m makerModel) View() string {
 	lw, pw, ch := m.listW(), m.previewW(), m.contentH()
 
-	// ── header ───────────────────────────────────────────────────────────────
-	logo := "░▒▓ MAKER ▓▒░"
+	// ── header (multi-line logo + meta) ──────────────────────────────────────
 	crumb := "home"
 	if m.activeCmdlet != "" {
 		crumb = "home › " + m.activeCmdlet
 	}
-	stats := fmt.Sprintf("cmdlets:%d  chains:%d", len(m.cmdlets), len(m.chains))
-
-	hLeft := makerHeaderLogoStyle.Render(logo) + makerHeaderCrumbStyle.Render("· "+crumb)
-	hRight := makerHeaderStatsStyle.Render(stats)
-	hPad := m.width - lipgloss.Width(hLeft) - lipgloss.Width(hRight)
-	if hPad < 0 {
-		hPad = 0
+	logoLines := LogoLines()
+	metaLines := []string{
+		"",
+		makerHdrLabelStyle.Render("command repository"),
+		"",
+		makerHdrCrumbStyle.Render(crumb),
+		makerHdrStatsStyle.Render(fmt.Sprintf("cmdlets:%d  chains:%d", len(m.cmdlets), len(m.chains))),
+		"",
 	}
-	header := hLeft + makerHeaderFillStyle.Width(hPad).Render("") + hRight
+	headerRows := make([]string, len(logoLines))
+	for i, lin := range logoLines {
+		meta := ""
+		if i < len(metaLines) {
+			meta = metaLines[i]
+		}
+		headerRows[i] = "  " + lin + "    " + meta
+	}
+	header := strings.Join(headerRows, "\n")
+
+	sepW := m.width
+	if sepW < 1 {
+		sepW = 1
+	}
+	separator := makerDividerStyle.Render(strings.Repeat("─", sepW))
 
 	// ── panels ────────────────────────────────────────────────────────────────
 	// resize for this frame (safe since View() gets a value copy)
@@ -738,7 +743,7 @@ func (m makerModel) View() string {
 		hintLine = makerHintStyle.Render("↑↓ nav  enter executar  /del  /log  /add <cmd>  /help  esc voltar")
 	}
 
-	return strings.Join([]string{header, body, statusLine, inputLine, hintLine}, "\n")
+	return strings.Join([]string{header, separator, body, statusLine, inputLine, hintLine}, "\n")
 }
 
 // runMakerShell launches the bubbletea TUI.
