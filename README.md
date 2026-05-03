@@ -30,9 +30,9 @@ It runs as a one-shot command (`moc sf list`) **or** as an interactive shell
 |---|---|
 | ![moc main](docs/screenshots/MOC%201.png) | ![moc help](docs/screenshots/MOC%201.1.png) |
 
-| Maker mode |
-|---|
-| ![maker mode](docs/screenshots/MOC%202.png) |
+| Maker mode | Step Functions — state machines |
+|---|---|
+| ![maker mode](docs/screenshots/MOC%202.png) | ![sf list](docs/screenshots/MOC%20SF%20LS.png) |
 
 ## Install
 
