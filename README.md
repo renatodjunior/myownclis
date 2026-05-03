@@ -1,13 +1,6 @@
 <div align="center">
 
-```
-███╗   ███╗  ██████╗   ██████╗
-████╗ ████║ ██╔═══██╗ ██╔════╝
-██╔████╔██║ ██║   ██║ ██║     
-██║╚██╔╝██║ ██║   ██║ ██║     
-██║ ╚═╝ ██║ ╚██████╔╝ ╚██████╗
-╚═╝     ╚═╝  ╚═════╝   ╚═════╝
-```
+<img src="docs/screenshots/logo.png" alt="MOC" width="360" />
 
 **MyOwnCLI** — personal CLI hub for AWS and other services
 
