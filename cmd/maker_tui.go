@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -630,10 +631,12 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 		command = cmdlet + " " + command
 	}
 
+	cwd, _ := os.Getwd()
 	c := &Command{
 		Cmdlet:     cmdlet,
 		Command:    command,
 		Type:       "shell",
+		Workdir:    cwd,
 		CreatedAt:  time.Now(),
 		LastStatus: "never",
 	}
