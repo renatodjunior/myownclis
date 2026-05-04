@@ -306,8 +306,8 @@ func (m makerModel) previewCommand(c *Command) string {
 	if len(lines) > 0 {
 		b.WriteString("\n")
 		b.WriteString(makerPvTitleStyle.Render("  LOG") + "\n")
-		for _, l := range lines {
-			b.WriteString(makerPvDimStyle.Render("  "+truncateMaker(l, 46)) + "\n")
+		for _, l := range reverseLogEntries(lines) {
+			b.WriteString(makerPvDimStyle.Render("  "+l) + "\n")
 		}
 	}
 	return b.String()
@@ -372,10 +372,33 @@ func buildExecPreview(c *Command, lines []string) string {
 	}
 	b.WriteString("\n")
 	b.WriteString(makerPvTitleStyle.Render("  OUTPUT LOG") + "\n")
-	for _, l := range lines {
+	for _, l := range reverseLogEntries(lines) {
 		b.WriteString(makerPvDimStyle.Render("  "+l) + "\n")
 	}
 	return b.String()
+}
+
+// reverseLogEntries flips chronological log lines so newest entry shows first.
+// An entry starts with a "[YYYY-MM-DD ..." header and may span multiple lines
+// of captured output before the next header.
+func reverseLogEntries(lines []string) []string {
+	var entries [][]string
+	var cur []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "[") && len(cur) > 0 {
+			entries = append(entries, cur)
+			cur = nil
+		}
+		cur = append(cur, l)
+	}
+	if len(cur) > 0 {
+		entries = append(entries, cur)
+	}
+	out := make([]string, 0, len(lines))
+	for i := len(entries) - 1; i >= 0; i-- {
+		out = append(out, entries[i]...)
+	}
+	return out
 }
 
 func truncateMaker(s string, max int) string {
