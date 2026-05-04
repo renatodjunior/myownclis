@@ -116,6 +116,7 @@ var makerScheduleCmd = &cobra.Command{
 		if makerCronFlag == "" {
 			return fmt.Errorf("--cron is required")
 		}
+		makerCronFlag = ExpandCronAlias(makerCronFlag)
 		if err := ValidateCron(makerCronFlag); err != nil {
 			return fmt.Errorf("invalid cron expression: %w", err)
 		}
@@ -352,4 +353,5 @@ func init() {
 	makerCmd.AddCommand(makerBackupCmd)
 	makerCmd.AddCommand(makerRestoreCmd)
 	makerCmd.AddCommand(makerChainCmd)
+	makerCmd.AddCommand(makerExamplesCmd)
 }

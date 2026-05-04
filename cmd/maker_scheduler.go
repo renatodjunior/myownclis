@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +96,91 @@ func ValidateCron(expr string) error {
 	p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	_, err := p.Parse(expr)
 	return err
+}
+
+// ExpandCronAlias translates friendly expressions to standard 5-field cron.
+// Returns the input unchanged when no alias matched, so explicit "* * * * *"
+// expressions and robfig "@daily"-style shortcuts continue to work as-is.
+//
+// Supported aliases (case-insensitive, whitespace-tolerant):
+//
+//	every minute / minutely             → * * * * *
+//	every N min[s] / Nm                 → */N * * * *
+//	every hour / hourly                 → 0 * * * *
+//	every N hour[s] / Nh                → 0 */N * * *
+//	daily / every day                   → 0 0 * * *
+//	daily at H[am|pm] / daily H:MM      → MM H * * *
+//	weekdays [at H[am|pm]]              → 0 9 * * 1-5  (default 9am)
+//	weekends [at H[am|pm]]              → 0 9 * * 0,6  (default 9am)
+func ExpandCronAlias(s string) string {
+	raw := strings.TrimSpace(strings.ToLower(s))
+	if raw == "" {
+		return s
+	}
+
+	switch raw {
+	case "every minute", "minutely":
+		return "* * * * *"
+	case "every hour", "hourly":
+		return "0 * * * *"
+	case "every day", "daily":
+		return "0 0 * * *"
+	case "weekdays":
+		return "0 9 * * 1-5"
+	case "weekends":
+		return "0 9 * * 0,6"
+	}
+
+	if m := reEveryNMin.FindStringSubmatch(raw); m != nil {
+		return fmt.Sprintf("*/%s * * * *", m[1])
+	}
+	if m := reShortMin.FindStringSubmatch(raw); m != nil {
+		return fmt.Sprintf("*/%s * * * *", m[1])
+	}
+	if m := reEveryNHour.FindStringSubmatch(raw); m != nil {
+		return fmt.Sprintf("0 */%s * * *", m[1])
+	}
+	if m := reShortHour.FindStringSubmatch(raw); m != nil {
+		return fmt.Sprintf("0 */%s * * *", m[1])
+	}
+	if m := reDailyAt.FindStringSubmatch(raw); m != nil {
+		h, mn := parseHourMinAmPm(m[1], m[2], m[3])
+		return fmt.Sprintf("%d %d * * *", mn, h)
+	}
+	if m := reWeekdaysAt.FindStringSubmatch(raw); m != nil {
+		h, mn := parseHourMinAmPm(m[1], m[2], m[3])
+		return fmt.Sprintf("%d %d * * 1-5", mn, h)
+	}
+	if m := reWeekendsAt.FindStringSubmatch(raw); m != nil {
+		h, mn := parseHourMinAmPm(m[1], m[2], m[3])
+		return fmt.Sprintf("%d %d * * 0,6", mn, h)
+	}
+
+	return s
+}
+
+var (
+	reEveryNMin  = regexp.MustCompile(`^every\s+(\d+)\s*(?:m|min|mins|minute|minutes)$`)
+	reShortMin   = regexp.MustCompile(`^(\d+)m$`)
+	reEveryNHour = regexp.MustCompile(`^every\s+(\d+)\s*(?:h|hour|hours)$`)
+	reShortHour  = regexp.MustCompile(`^(\d+)h$`)
+	reDailyAt    = regexp.MustCompile(`^(?:daily|every\s+day)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?(am|pm)?$`)
+	reWeekdaysAt = regexp.MustCompile(`^weekdays\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?(am|pm)?$`)
+	reWeekendsAt = regexp.MustCompile(`^weekends\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?(am|pm)?$`)
+)
+
+func parseHourMinAmPm(hStr, mStr, ampm string) (h, mn int) {
+	h, _ = strconv.Atoi(hStr)
+	if mStr != "" {
+		mn, _ = strconv.Atoi(mStr)
+	}
+	if ampm == "pm" && h < 12 {
+		h += 12
+	}
+	if ampm == "am" && h == 12 {
+		h = 0
+	}
+	return
 }
 
 func RegisterOSSchedule(cmdlet, slug, cronExpr string) error {

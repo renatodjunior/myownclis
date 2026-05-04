@@ -110,6 +110,54 @@ Inside the TUI:
 | `/help` | All commands and shortcuts |
 | `exit`, `q` | Leave maker |
 
+#### Reference — every `moc maker` command
+
+Built-in tutorial: **`moc maker examples`** prints a step-by-step walkthrough.
+
+| Command | What it does |
+|---|---|
+| `moc maker` | Open the interactive TUI |
+| `moc maker <command...>` | Save (cwd-bound) + run. Cmdlet = first word. |
+| `moc maker --add <command...>` | Save only, do not run |
+| `moc maker --workdir <dir> <command...>` | Override the captured workdir |
+| `moc maker ls` | List cmdlets and chains |
+| `moc maker run <cmdlet> <slug>` | Run a saved command by slug |
+| `moc maker log <cmdlet> <slug>` | Tail the log (add `--all` for the full log) |
+| `moc maker schedule <cmdlet> <slug> --cron "<expr>"` | Schedule (in-session) |
+| `moc maker schedule ... --cron "<expr>" --os` | Also register in cron / schtasks |
+| `moc maker unschedule <cmdlet> <slug> [--os]` | Remove the schedule |
+| `moc maker chain add <name> <cmdlet/slug>...` | Create a chain (stops on first error) |
+| `moc maker chain run <name>` | Run a chain |
+| `moc maker chain export <name>` | Print chain as a portable bash script |
+| `moc maker backup` | Dump everything to `~/.moc/backup/<date>.yaml` |
+| `moc maker restore <file>` | Restore from a backup file |
+| `moc maker examples` | Print the tutorial inline |
+
+##### Cron — easy mode
+
+Standard 5-field cron (`min hour dom month dow`) is fully supported. So are these
+friendly aliases — they translate before being parsed, so you can mix and match:
+
+| Easy mode | Equivalent cron |
+|---|---|
+| `every 5m`, `5m`, `every 5 minutes` | `*/5 * * * *` |
+| `hourly`, `every hour` | `0 * * * *` |
+| `every 2h`, `2h` | `0 */2 * * *` |
+| `daily` | `0 0 * * *` |
+| `daily at 9am`, `daily at 9` | `0 9 * * *` |
+| `daily at 14:30` | `30 14 * * *` |
+| `weekdays`, `weekdays at 8am` | `0 9 * * 1-5` (default 9am), `0 8 * * 1-5` |
+| `weekends`, `weekends at 10am` | `0 9 * * 0,6` (default 9am), `0 10 * * 0,6` |
+| `@hourly`, `@daily`, `@weekly` | robfig presets, passed through |
+
+Examples:
+
+```bash
+moc maker schedule git status --cron "every 15m"
+moc maker schedule git fetch  --cron "weekdays at 9am"
+moc maker schedule kubectl get-pods --cron "*/10 * * * *"     # raw cron still works
+```
+
 ## Configuration
 
 `moc` reads a YAML config from the standard location for your OS
