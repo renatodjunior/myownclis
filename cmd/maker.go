@@ -22,7 +22,7 @@ var (
 
 var makerCmd = &cobra.Command{
 	Use:   "maker",
-	Short: "Repositório pessoal de comandos CLI",
+	Short: "Personal CLI command repository",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return runMakerShell()
@@ -36,7 +36,7 @@ var makerCmd = &cobra.Command{
 var makerLsCmd = &cobra.Command{
 	Use:     "ls",
 	Aliases: []string{"list"},
-	Short:   "Lista cmdlets e chains",
+	Short:   "List cmdlets and chains",
 	RunE:    runMakerLs,
 }
 
@@ -50,7 +50,7 @@ func runMakerLs(_ *cobra.Command, _ []string) error {
 		fmt.Printf("  %-20s %s\n", styleSuccess.Render(c), styleDim.Render(fmt.Sprintf("%d commands", len(cmds))))
 	}
 	if len(cmdlets) == 0 {
-		fmt.Printf("  %s\n", styleDim.Render("Nenhum. Use: moc maker <cmdlet> <command>"))
+		fmt.Printf("  %s\n", styleDim.Render("None. Use: moc maker <cmdlet> <command>"))
 	}
 	fmt.Printf("\n  %s\n\n", styleHeader.Render("CHAINS"))
 	for _, ch := range chains {
@@ -58,7 +58,7 @@ func runMakerLs(_ *cobra.Command, _ []string) error {
 			styleDim.Render(fmt.Sprintf("%d steps · %s", len(ch.Steps), ch.LastStatus)))
 	}
 	if len(chains) == 0 {
-		fmt.Printf("  %s\n", styleDim.Render("Nenhuma. Use: moc maker chain add <nome> <steps...>"))
+		fmt.Printf("  %s\n", styleDim.Render("None. Use: moc maker chain add <name> <steps...>"))
 	}
 	fmt.Println()
 	return nil
@@ -68,12 +68,12 @@ func runMakerLs(_ *cobra.Command, _ []string) error {
 
 var makerRunCmd = &cobra.Command{
 	Use:   "run <cmdlet> <slug>",
-	Short: "Executa comando salvo",
+	Short: "Run a saved command",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(_ *cobra.Command, args []string) error {
 		c, err := LoadCommand(args[0], args[1])
 		if err != nil {
-			return fmt.Errorf("comando não encontrado: %s/%s", args[0], args[1])
+			return fmt.Errorf("command not found: %s/%s", args[0], args[1])
 		}
 		return RunCommand(c, true)
 	},
@@ -83,7 +83,7 @@ var makerRunCmd = &cobra.Command{
 
 var makerLogCmd = &cobra.Command{
 	Use:   "log <cmdlet> <slug>",
-	Short: "Exibe log de um comando",
+	Short: "Show log of a command",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(_ *cobra.Command, args []string) error {
 		name := logName(args[0], args[1])
@@ -110,25 +110,25 @@ var makerLogCmd = &cobra.Command{
 
 var makerScheduleCmd = &cobra.Command{
 	Use:   "schedule <cmdlet> <slug>",
-	Short: "Agenda um comando",
+	Short: "Schedule a command",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(_ *cobra.Command, args []string) error {
 		if makerCronFlag == "" {
-			return fmt.Errorf("--cron é obrigatório")
+			return fmt.Errorf("--cron is required")
 		}
 		if err := ValidateCron(makerCronFlag); err != nil {
-			return fmt.Errorf("expressão cron inválida: %w", err)
+			return fmt.Errorf("invalid cron expression: %w", err)
 		}
 		cmdlet, slug := args[0], args[1]
 		c, err := LoadCommand(cmdlet, slug)
 		if err != nil {
-			return fmt.Errorf("comando não encontrado: %s/%s", cmdlet, slug)
+			return fmt.Errorf("command not found: %s/%s", cmdlet, slug)
 		}
 		c.Schedule.Cron = makerCronFlag
 		c.Schedule.InSession = true
 		if makerOSFlag {
 			if err := RegisterOSSchedule(cmdlet, slug, makerCronFlag); err != nil {
-				fmt.Printf("  %s\n", styleWarning.Render("Aviso: falha ao registrar no OS: "+err.Error()))
+				fmt.Printf("  %s\n", styleWarning.Render("Warning: failed to register on OS: "+err.Error()))
 			} else {
 				c.Schedule.OSRegistered = true
 			}
@@ -136,7 +136,7 @@ var makerScheduleCmd = &cobra.Command{
 		if err := SaveCommand(c); err != nil {
 			return err
 		}
-		fmt.Printf("  %s %s/%s agendado (%s)\n", styleSuccess.Render("✓"), cmdlet, slug, makerCronFlag)
+		fmt.Printf("  %s %s/%s scheduled (%s)\n", styleSuccess.Render("✓"), cmdlet, slug, makerCronFlag)
 		return nil
 	},
 }
@@ -145,17 +145,17 @@ var makerScheduleCmd = &cobra.Command{
 
 var makerUnscheduleCmd = &cobra.Command{
 	Use:   "unschedule <cmdlet> <slug>",
-	Short: "Remove agendamento",
+	Short: "Remove schedule",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(_ *cobra.Command, args []string) error {
 		cmdlet, slug := args[0], args[1]
 		c, err := LoadCommand(cmdlet, slug)
 		if err != nil {
-			return fmt.Errorf("comando não encontrado: %s/%s", cmdlet, slug)
+			return fmt.Errorf("command not found: %s/%s", cmdlet, slug)
 		}
 		if makerOSFlag && c.Schedule.OSRegistered {
 			if err := UnregisterOSSchedule(cmdlet, slug); err != nil {
-				fmt.Printf("  %s\n", styleWarning.Render("Falha ao remover do OS: "+err.Error()))
+				fmt.Printf("  %s\n", styleWarning.Render("Failed to remove from OS: "+err.Error()))
 			} else {
 				c.Schedule.OSRegistered = false
 			}
@@ -165,7 +165,7 @@ var makerUnscheduleCmd = &cobra.Command{
 		if err := SaveCommand(c); err != nil {
 			return err
 		}
-		fmt.Printf("  %s %s/%s agendamento removido\n", styleSuccess.Render("✓"), cmdlet, slug)
+		fmt.Printf("  %s %s/%s schedule removed\n", styleSuccess.Render("✓"), cmdlet, slug)
 		return nil
 	},
 }
@@ -174,7 +174,7 @@ var makerUnscheduleCmd = &cobra.Command{
 
 var makerBackupCmd = &cobra.Command{
 	Use:   "backup",
-	Short: "Exporta comandos e chains",
+	Short: "Export commands and chains",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		dest := filepath.Join(MocDir(), "backup", time.Now().Format("2006-01-02")+".yaml")
 		if err := Backup(dest); err != nil {
@@ -186,14 +186,14 @@ var makerBackupCmd = &cobra.Command{
 }
 
 var makerRestoreCmd = &cobra.Command{
-	Use:   "restore <arquivo>",
-	Short: "Importa backup",
+	Use:   "restore <file>",
+	Short: "Import backup",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		if err := Restore(args[0]); err != nil {
 			return err
 		}
-		fmt.Printf("  %s %s\n", styleSuccess.Render("✓ Restaurado de:"), styleDim.Render(args[0]))
+		fmt.Printf("  %s %s\n", styleSuccess.Render("✓ Restored from:"), styleDim.Render(args[0]))
 		return nil
 	},
 }
@@ -202,12 +202,12 @@ var makerRestoreCmd = &cobra.Command{
 
 var makerChainCmd = &cobra.Command{
 	Use:   "chain",
-	Short: "Gerencia chains de comandos",
+	Short: "Manage command chains",
 }
 
 var makerChainAddCmd = &cobra.Command{
-	Use:   "add <nome> <cmdlet/slug>...",
-	Short: "Cria chain",
+	Use:   "add <name> <cmdlet/slug>...",
+	Short: "Create chain",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
@@ -225,32 +225,32 @@ var makerChainAddCmd = &cobra.Command{
 		if err := SaveChain(chain); err != nil {
 			return err
 		}
-		fmt.Printf("  %s chain %s com %d steps\n", styleSuccess.Render("✓"), name, len(steps))
+		fmt.Printf("  %s chain %s with %d steps\n", styleSuccess.Render("✓"), name, len(steps))
 		return nil
 	},
 }
 
 var makerChainRunCmd = &cobra.Command{
-	Use:   "run <nome>",
-	Short: "Executa chain",
+	Use:   "run <name>",
+	Short: "Run chain",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		chain, err := LoadChain(args[0])
 		if err != nil {
-			return fmt.Errorf("chain não encontrada: %s", args[0])
+			return fmt.Errorf("chain not found: %s", args[0])
 		}
 		return RunChain(chain, true)
 	},
 }
 
 var makerChainExportCmd = &cobra.Command{
-	Use:   "export <nome>",
-	Short: "Exporta chain como shell script",
+	Use:   "export <name>",
+	Short: "Export chain as shell script",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		chain, err := LoadChain(args[0])
 		if err != nil {
-			return fmt.Errorf("chain não encontrada: %s", args[0])
+			return fmt.Errorf("chain not found: %s", args[0])
 		}
 		fmt.Println("#!/bin/bash")
 		if chain.StopOnError {
@@ -278,7 +278,7 @@ var makerChainExportCmd = &cobra.Command{
 // Same command → exec only. Changed command → update+save+exec. --add → save only.
 func runMakerSaveAndExec(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("uso: moc maker <cmdlet> <command>")
+		return fmt.Errorf("usage: moc maker <cmdlet> <command>")
 	}
 	cmdlet := args[0]
 	rest := strings.Join(args[1:], " ")
@@ -318,27 +318,26 @@ func runMakerSaveAndExec(args []string) error {
 	if err := SaveCommand(c); err != nil {
 		return err
 	}
-	fmt.Printf("  %s %s/%s\n", styleDim.Render("salvo:"), cmdlet, slug)
+	fmt.Printf("  %s %s/%s\n", styleDim.Render("saved:"), cmdlet, slug)
 	if makerAddFlag {
 		return nil
 	}
 	return RunCommand(c, true)
 }
 
-
 // ── init ──────────────────────────────────────────────────────────────────────
 
 func init() {
-	makerCmd.Flags().BoolVar(&makerAddFlag, "add", false, "Apenas salva, não executa")
-	makerCmd.Flags().StringVar(&makerWorkdirFlag, "workdir", "", "Diretório de trabalho")
+	makerCmd.Flags().BoolVar(&makerAddFlag, "add", false, "Save only, don't run")
+	makerCmd.Flags().StringVar(&makerWorkdirFlag, "workdir", "", "Working directory")
 
-	makerLogCmd.Flags().BoolVar(&makerAllFlag, "all", false, "Exibe log completo")
+	makerLogCmd.Flags().BoolVar(&makerAllFlag, "all", false, "Show full log")
 
-	makerScheduleCmd.Flags().StringVar(&makerCronFlag, "cron", "", "Expressão cron (obrigatório)")
-	makerScheduleCmd.Flags().BoolVar(&makerOSFlag, "os", false, "Registrar no OS (cron/schtasks)")
+	makerScheduleCmd.Flags().StringVar(&makerCronFlag, "cron", "", "Cron expression (required)")
+	makerScheduleCmd.Flags().BoolVar(&makerOSFlag, "os", false, "Register on OS (cron/schtasks)")
 	makerScheduleCmd.MarkFlagRequired("cron")
 
-	makerUnscheduleCmd.Flags().BoolVar(&makerOSFlag, "os", false, "Remover também do OS")
+	makerUnscheduleCmd.Flags().BoolVar(&makerOSFlag, "os", false, "Also remove from OS")
 
 	makerChainCmd.AddCommand(makerChainAddCmd)
 	makerChainCmd.AddCommand(makerChainRunCmd)

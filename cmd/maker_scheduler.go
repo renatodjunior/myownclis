@@ -116,7 +116,7 @@ func UnregisterOSSchedule(cmdlet, slug string) error {
 func registerWindowsTask(taskName, runCmd, cronExpr string) error {
 	schedule, interval, startTime, approximated := cronToSchtasks(cronExpr)
 	if approximated {
-		fmt.Printf("  %s\n", styleWarning.Render("Aviso: expressão cron complexa — aproximando para MINUTE/"+interval))
+		fmt.Printf("  %s\n", styleWarning.Render("Warning: complex cron expression — approximating to MINUTE/"+interval))
 	}
 	args := []string{"/Create", "/F", "/TN", taskName, "/TR", runCmd, "/SC", schedule}
 	if interval != "" {

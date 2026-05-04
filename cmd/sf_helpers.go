@@ -38,7 +38,7 @@ func awsClient(ctx context.Context) (*sfn.Client, error) {
 	}
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao carregar config AWS: %w", err)
+		return nil, fmt.Errorf("error loading AWS config: %w", err)
 	}
 	return sfn.NewFromConfig(cfg), nil
 }
@@ -102,7 +102,7 @@ func fetchExecutions(ctx context.Context, client *sfn.Client, machineArn string,
 	}
 	out, err := client.ListExecutions(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao listar execuções: %w", err)
+		return nil, fmt.Errorf("error listing executions: %w", err)
 	}
 	return out.Executions, nil
 }
@@ -122,10 +122,10 @@ func resolveArn(ctx context.Context, client *sfn.Client, nameOrArn string) (stri
 			return aws.ToString(m.StateMachineArn), nil
 		}
 	}
-	return "", fmt.Errorf("state machine não encontrada: %s", nameOrArn)
+	return "", fmt.Errorf("state machine not found: %s", nameOrArn)
 }
 
-// ── formatação ────────────────────────────────────────────────────────────────
+// ── formatting ────────────────────────────────────────────────────────────────
 
 func prettyJSON(s string) string {
 	var v interface{}
@@ -191,7 +191,7 @@ func detailSummary(e types.HistoryEvent) string {
 	}
 }
 
-// ── prompt numérico ───────────────────────────────────────────────────────────
+// ── numeric prompt ────────────────────────────────────────────────────────────
 
 func promptConfirm(question string) bool {
 	fmt.Printf("  %s [y/N]: ", stylePick.Render(question))
@@ -208,7 +208,7 @@ func promptInt(label string, min, max int) int {
 	}
 	var n int
 	if _, err := fmt.Sscanf(strings.TrimSpace(scanner.Text()), "%d", &n); err != nil || n < min || n > max {
-		fmt.Println(styleError.Render(fmt.Sprintf("  Escolha entre %d e %d", min, max)))
+		fmt.Println(styleError.Render(fmt.Sprintf("  Choose between %d and %d", min, max)))
 		return -1
 	}
 	return n

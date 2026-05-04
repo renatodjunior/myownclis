@@ -34,7 +34,7 @@ type watchModel struct {
 	client      *sfn.Client
 	ctx         context.Context
 	interval    int
-	filterArn   string // se preenchido, filtra só essa machine
+	filterArn   string // if set, filter only this machine
 	filterName  string
 	width       int
 	height      int
@@ -145,7 +145,7 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m watchModel) View() string {
 	now := time.Now().Format("15:04:05")
-	refresh := styleDim.Render(fmt.Sprintf("atualizado %s · %ds", now, m.interval))
+	refresh := styleDim.Render(fmt.Sprintf("updated %s · %ds", now, m.interval))
 
 	title := styleHeader.Render("  DASHBOARD — RUNNING")
 	if m.filterName != "" {
@@ -157,7 +157,7 @@ func (m watchModel) View() string {
 	}
 
 	if m.err != nil {
-		return "\n" + titleLine + "\n\n" + styleError.Render("  Erro: "+m.err.Error()) + "\n"
+		return "\n" + titleLine + "\n\n" + styleError.Render("  Error: "+m.err.Error()) + "\n"
 	}
 
 	totalRunning := 0
@@ -166,8 +166,8 @@ func (m watchModel) View() string {
 	}
 
 	if totalRunning == 0 {
-		empty := styleDim.Render("  Nenhuma execução em andamento.")
-		return "\n" + titleLine + "\n\n" + empty + "\n\n" + styleStatusBar.Render("  [q] sair") + "\n"
+		empty := styleDim.Render("  No executions in progress.")
+		return "\n" + titleLine + "\n\n" + empty + "\n\n" + styleStatusBar.Render("  [q] quit") + "\n"
 	}
 
 	leftW := m.width / 3
@@ -181,7 +181,7 @@ func (m watchModel) View() string {
 
 	var leftLines, rightLines []string
 	leftLines = append(leftLines, styleHeader.Render("MACHINES"))
-	rightLines = append(rightLines, styleHeader.Render("EXECUÇÕES RUNNING"))
+	rightLines = append(rightLines, styleHeader.Render("RUNNING EXECUTIONS"))
 
 	for _, row := range m.data {
 		count := styleRunning.Render(fmt.Sprintf("(%d)", len(row.running)))
@@ -208,7 +208,7 @@ func (m watchModel) View() string {
 		" "+rightStyle.Render(strings.Join(rightLines, "\n")),
 	)
 
-	statusText := fmt.Sprintf("  %s running  ·  refresh %ds  ·  [q] sair",
+	statusText := fmt.Sprintf("  %s running  ·  refresh %ds  ·  [q] quit",
 		styleRunning.Render(fmt.Sprintf("%d", totalRunning)),
 		m.interval,
 	)

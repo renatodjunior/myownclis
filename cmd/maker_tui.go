@@ -39,7 +39,7 @@ type makerCommandItem struct{ cmd *Command }
 func (i makerCommandItem) Title() string { return i.cmd.Command }
 func (i makerCommandItem) Description() string {
 	if i.cmd.LastRun == nil {
-		return "nunca executado"
+		return "never run"
 	}
 	icon := "✓"
 	if i.cmd.LastStatus == "failed" {
@@ -219,13 +219,13 @@ func (m makerModel) previewWelcome() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(makerPvTitleStyle.Render("  WELCOME") + "\n")
-	b.WriteString(makerPvDimStyle.Render("  Repositório pessoal de comandos CLI.") + "\n\n")
+	b.WriteString(makerPvDimStyle.Render("  Personal CLI command repository.") + "\n\n")
 	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "cmdlets")) +
 		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.cmdlets))) + "\n")
 	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "chains")) +
 		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.chains))) + "\n\n")
-	b.WriteString(makerPvDimStyle.Render("  ↑↓ selecione um cmdlet para ver seus commands.") + "\n")
-	b.WriteString(makerPvDimStyle.Render("  /help para ver todos os comandos disponíveis.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  ↑↓ select a cmdlet to view its commands.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  /help to see all available commands.") + "\n")
 	return b.String()
 }
 
@@ -236,7 +236,7 @@ func (m makerModel) previewCmdlet(name string) string {
 	b.WriteString(makerPvTitleStyle.Render("  " + strings.ToUpper(name)) + "\n")
 
 	if len(cmds) == 0 {
-		b.WriteString(makerPvDimStyle.Render("  sem commands — use /add para adicionar") + "\n")
+		b.WriteString(makerPvDimStyle.Render("  no commands — use /add to add one") + "\n")
 		return b.String()
 	}
 	for _, c := range cmds {
@@ -315,17 +315,17 @@ func (m makerModel) previewCommand(c *Command) string {
 func (m makerModel) helpContent() string {
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(makerPvTitleStyle.Render("  COMANDOS") + "\n")
+	b.WriteString(makerPvTitleStyle.Render("  COMMANDS") + "\n")
 	cmds := [][]string{
-		{"enter", "executar / navegar para cmdlet"},
-		{"esc", "voltar / limpar input"},
-		{"/add <cmd>", "salvar no cmdlet ativo"},
-		{"/add <c> <cmd>", "salvar em qualquer cmdlet"},
-		{"/del", "deletar command selecionado"},
-		{"/log", "log do command selecionado"},
-		{"/help", "esta ajuda"},
-		{"ls", "voltar para home"},
-		{"exit / q", "sair do maker"},
+		{"enter", "run / open cmdlet"},
+		{"esc", "back / clear input"},
+		{"/add <cmd>", "save in active cmdlet"},
+		{"/add <c> <cmd>", "save in any cmdlet"},
+		{"/del", "delete selected command"},
+		{"/log", "log of selected command"},
+		{"/help", "this help"},
+		{"ls", "back to home"},
+		{"exit / q", "leave maker"},
 	}
 	for _, row := range cmds {
 		b.WriteString(fmt.Sprintf("  %s  %s\n",
@@ -335,11 +335,11 @@ func (m makerModel) helpContent() string {
 		))
 	}
 	b.WriteString("\n")
-	b.WriteString(makerPvTitleStyle.Render("  ATALHOS") + "\n")
+	b.WriteString(makerPvTitleStyle.Render("  SHORTCUTS") + "\n")
 	shortcuts := [][]string{
-		{"↑↓", "navegar lista"},
-		{"PgUp/PgDn", "navegar rápido"},
-		{"ctrl+c", "sair imediatamente"},
+		{"↑↓", "navigate list"},
+		{"PgUp/PgDn", "fast navigate"},
+		{"ctrl+c", "quit immediately"},
 	}
 	for _, row := range shortcuts {
 		b.WriteString(fmt.Sprintf("  %s  %s\n",
@@ -359,14 +359,14 @@ func buildExecPreview(c *Command, lines []string) string {
 	if c.LastStatus == "failed" {
 		statusStyle = makerPvErrStyle
 	}
-	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "resultado")) +
+	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "result")) +
 		statusStyle.Render(c.LastStatus) + "\n")
 	if c.LastRun != nil {
-		b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "executado")) +
+		b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "ran at")) +
 			makerPvValStyle.Render(c.LastRun.Format("02/01 15:04:05")) + "\n")
 	}
 	if len(lines) == 0 {
-		b.WriteString("\n" + makerPvDimStyle.Render("  sem output registrado") + "\n")
+		b.WriteString("\n" + makerPvDimStyle.Render("  no output recorded") + "\n")
 		return b.String()
 	}
 	b.WriteString("\n")
@@ -517,7 +517,7 @@ func (m makerModel) processCommand(input string) (tea.Model, tea.Cmd) {
 		return m.doAdd(strings.TrimPrefix(input, "add "))
 	}
 
-	m.statusMsg = "desconhecido: " + input
+	m.statusMsg = "unknown: " + input
 	m.isErr = true
 	return m, nil
 }
@@ -576,7 +576,7 @@ func (m makerModel) doRunCommand(c *Command) (makerModel, tea.Cmd) {
 
 func (m makerModel) doDel() (makerModel, tea.Cmd) {
 	if m.view != viewMakerCmdlet {
-		m.statusMsg = "entre em um cmdlet primeiro"
+		m.statusMsg = "open a cmdlet first"
 		m.isErr = true
 		return m, nil
 	}
@@ -586,11 +586,11 @@ func (m makerModel) doDel() (makerModel, tea.Cmd) {
 	}
 	slug := CommandSlug(ci.cmd.Cmdlet, ci.cmd.Command)
 	if err := DeleteCommand(ci.cmd.Cmdlet, slug); err != nil {
-		m.statusMsg = "erro: " + err.Error()
+		m.statusMsg = "error: " + err.Error()
 		m.isErr = true
 		return m, nil
 	}
-	m.statusMsg = "deletado: " + ci.cmd.Command
+	m.statusMsg = "deleted: " + ci.cmd.Command
 	m.commands, _ = ListCommands(m.activeCmdlet)
 	m.cmdlets, _ = ListCmdlets()
 	m = m.withRefreshedList()
@@ -604,7 +604,7 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 
 	if m.view == viewMakerCmdlet && m.activeCmdlet != "" {
 		if len(parts) < 1 {
-			m.statusMsg = "uso: /add <command>"
+			m.statusMsg = "usage: /add <command>"
 			m.isErr = true
 			return m, nil
 		}
@@ -612,7 +612,7 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 		command = arg
 	} else {
 		if len(parts) < 2 {
-			m.statusMsg = "uso: /add <cmdlet> <command>"
+			m.statusMsg = "usage: /add <cmdlet> <command>"
 			m.isErr = true
 			return m, nil
 		}
@@ -633,11 +633,11 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 		LastStatus: "never",
 	}
 	if err := SaveCommand(c); err != nil {
-		m.statusMsg = "erro: " + err.Error()
+		m.statusMsg = "error: " + err.Error()
 		m.isErr = true
 		return m, nil
 	}
-	m.statusMsg = "salvo: " + cmdlet + "/" + CommandSlug(cmdlet, command)
+	m.statusMsg = "saved: " + cmdlet + "/" + CommandSlug(cmdlet, command)
 	m.cmdlets, _ = ListCmdlets()
 	m.chains, _ = ListChains()
 	if m.activeCmdlet == cmdlet {
@@ -650,7 +650,7 @@ func (m makerModel) doAdd(arg string) (makerModel, tea.Cmd) {
 
 func (m makerModel) doLog() (makerModel, tea.Cmd) {
 	if m.view != viewMakerCmdlet {
-		m.statusMsg = "entre em um cmdlet primeiro"
+		m.statusMsg = "open a cmdlet first"
 		m.isErr = true
 		return m, nil
 	}
@@ -738,9 +738,9 @@ func (m makerModel) View() string {
 	// ── hints ─────────────────────────────────────────────────────────────────
 	var hintLine string
 	if m.view == viewMakerHome {
-		hintLine = makerHintStyle.Render("↑↓ nav  enter selecionar  /add <cmdlet> <cmd>  /help  exit")
+		hintLine = makerHintStyle.Render("↑↓ nav  enter select  /add <cmdlet> <cmd>  /help  exit")
 	} else {
-		hintLine = makerHintStyle.Render("↑↓ nav  enter executar  /del  /log  /add <cmd>  /help  esc voltar")
+		hintLine = makerHintStyle.Render("↑↓ nav  enter run  /del  /log  /add <cmd>  /help  esc back")
 	}
 
 	return strings.Join([]string{header, separator, body, statusLine, inputLine, hintLine}, "\n")

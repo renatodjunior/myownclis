@@ -287,7 +287,7 @@ func (m sfShellModel) refreshList() sfShellModel {
 
 func (m sfShellModel) previewContent() string {
 	if m.loading {
-		return "\n  " + m.spinner.View() + "  " + makerPvDimStyle.Render("carregando...")
+		return "\n  " + m.spinner.View() + "  " + makerPvDimStyle.Render("loading...")
 	}
 	switch m.view {
 	case viewSFMachines:
@@ -307,11 +307,11 @@ func (m sfShellModel) previewWelcome() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(makerPvTitleStyle.Render("  STEP FUNCTIONS") + "\n")
-	b.WriteString(makerPvDimStyle.Render("  Browser de state machines e execuções AWS.") + "\n\n")
+	b.WriteString(makerPvDimStyle.Render("  Browser for AWS state machines and executions.") + "\n\n")
 	b.WriteString(makerPvKeyStyle.Render(fmt.Sprintf("  %-10s", "machines")) +
 		makerPvValStyle.Render(fmt.Sprintf("%d", len(m.machines))) + "\n\n")
-	b.WriteString(makerPvDimStyle.Render("  ↑↓ selecione uma machine para abrir suas execuções.") + "\n")
-	b.WriteString(makerPvDimStyle.Render("  /help para ver todos os comandos disponíveis.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  ↑↓ select a machine to open its executions.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  /help to see all available commands.") + "\n")
 	return b.String()
 }
 
@@ -321,7 +321,7 @@ func (m sfShellModel) previewMachine(mi sfMachineItem) string {
 	b.WriteString(makerPvTitleStyle.Render("  "+strings.ToUpper(mi.name)) + "\n")
 	b.WriteString(makerPvKeyStyle.Render("  arn  ") +
 		makerPvDimStyle.Render(truncateMaker(mi.arn, 50)) + "\n\n")
-	b.WriteString(makerPvDimStyle.Render("  Enter para listar execuções desta machine.") + "\n")
+	b.WriteString(makerPvDimStyle.Render("  Enter to list executions of this machine.") + "\n")
 	return b.String()
 }
 
@@ -354,18 +354,18 @@ func (m sfShellModel) previewExec(e types.ExecutionListItem) string {
 func (m sfShellModel) helpContent() string {
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(makerPvTitleStyle.Render("  COMANDOS") + "\n")
+	b.WriteString(makerPvTitleStyle.Render("  COMMANDS") + "\n")
 	cmds := [][]string{
-		{"enter", "abrir machine / mostrar history da exec"},
-		{"esc", "voltar / limpar input"},
-		{"/history", "history completo da execução selecionada"},
-		{"/input", "input + output formatados"},
-		{"/rerun", "reprocessa execução com mesmo input"},
-		{"/start", "inicia nova execução com input vazio {}"},
-		{"/refresh", "recarrega lista atual"},
-		{"/help", "esta ajuda"},
-		{"ls", "voltar para state machines"},
-		{"exit / q", "sair do sf"},
+		{"enter", "open machine / show exec history"},
+		{"esc", "back / clear input"},
+		{"/history", "full history of selected execution"},
+		{"/input", "input + output formatted"},
+		{"/rerun", "re-run execution with same input"},
+		{"/start", "start new execution with empty input {}"},
+		{"/refresh", "reload current list"},
+		{"/help", "this help"},
+		{"ls", "back to state machines"},
+		{"exit / q", "leave sf"},
 	}
 	for _, row := range cmds {
 		b.WriteString(fmt.Sprintf("  %s  %s\n",
@@ -375,11 +375,11 @@ func (m sfShellModel) helpContent() string {
 		))
 	}
 	b.WriteString("\n")
-	b.WriteString(makerPvTitleStyle.Render("  ATALHOS") + "\n")
+	b.WriteString(makerPvTitleStyle.Render("  SHORTCUTS") + "\n")
 	shortcuts := [][]string{
-		{"↑↓", "navegar lista"},
-		{"PgUp/PgDn", "navegar rápido"},
-		{"ctrl+c", "sair imediatamente"},
+		{"↑↓", "navigate list"},
+		{"PgUp/PgDn", "fast navigate"},
+		{"ctrl+c", "quit immediately"},
 	}
 	for _, row := range shortcuts {
 		b.WriteString(fmt.Sprintf("  %s  %s\n",
@@ -517,26 +517,26 @@ func (m sfShellModel) processCommand(input string) (tea.Model, tea.Cmd) {
 		if e, ok := m.list.SelectedItem().(sfExecItem); ok {
 			return m, sfFetchHistoryCmd(m.client, m.ctx, aws.ToString(e.e.ExecutionArn))
 		}
-		m.statusMsg = "selecione uma execução primeiro"
+		m.statusMsg = "select an execution first"
 		m.isErr = true
 		return m, nil
 	case "/input":
 		if e, ok := m.list.SelectedItem().(sfExecItem); ok {
 			return m, sfFetchInputCmd(m.client, m.ctx, aws.ToString(e.e.ExecutionArn))
 		}
-		m.statusMsg = "selecione uma execução primeiro"
+		m.statusMsg = "select an execution first"
 		m.isErr = true
 		return m, nil
 	case "/rerun":
 		if e, ok := m.list.SelectedItem().(sfExecItem); ok {
 			return m, sfDoRerunCmd(m.client, m.ctx, aws.ToString(e.e.ExecutionArn))
 		}
-		m.statusMsg = "selecione uma execução primeiro"
+		m.statusMsg = "select an execution first"
 		m.isErr = true
 		return m, nil
 	case "/start":
 		if m.view != viewSFExecs {
-			m.statusMsg = "abra uma machine primeiro"
+			m.statusMsg = "open a machine first"
 			m.isErr = true
 			return m, nil
 		}
@@ -635,7 +635,7 @@ func (m sfShellModel) View() string {
 		}
 		statusLine = st.Render(m.statusMsg)
 	} else if m.loading {
-		statusLine = makerStatusOkStyle.Render("  " + m.spinner.View() + " carregando...")
+		statusLine = makerStatusOkStyle.Render("  " + m.spinner.View() + " loading...")
 	}
 
 	prompt := "sf"
@@ -649,9 +649,9 @@ func (m sfShellModel) View() string {
 
 	var hintLine string
 	if m.view == viewSFMachines {
-		hintLine = makerHintStyle.Render("↑↓ nav  enter abrir  /refresh  /help  exit")
+		hintLine = makerHintStyle.Render("↑↓ nav  enter open  /refresh  /help  exit")
 	} else {
-		hintLine = makerHintStyle.Render("↑↓ nav  enter history  /input  /rerun  /start  esc voltar")
+		hintLine = makerHintStyle.Render("↑↓ nav  enter history  /input  /rerun  /start  esc back")
 	}
 
 	return strings.Join([]string{header, separator, body, statusLine, inputLine, hintLine}, "\n")
