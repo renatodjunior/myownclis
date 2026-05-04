@@ -274,22 +274,23 @@ var makerChainExportCmd = &cobra.Command{
 
 // ── dynamic save+exec ─────────────────────────────────────────────────────────
 
-// runMakerSaveAndExec handles: moc maker <cmdlet> <command words...>
+// runMakerSaveAndExec handles flexible input forms:
+//   moc maker git status
+//   moc maker git branch -a
+//   moc maker "git branch -a"        (single quoted arg)
+//   moc maker git "branch -a"        (cmdlet + quoted rest)
+// Cmdlet is always the first word of the joined command line.
 // Same command → exec only. Changed command → update+save+exec. --add → save only.
 func runMakerSaveAndExec(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: moc maker <cmdlet> <command>")
+	if len(args) < 1 {
+		return fmt.Errorf("usage: moc maker <command>  (e.g. moc maker git status, moc maker \"git branch -a\")")
 	}
-	cmdlet := args[0]
-	rest := strings.Join(args[1:], " ")
-	// normalize: ensure command always starts with cmdlet so "git status" and
-	// passing ["git","status"] both resolve to the same stored entry.
-	var command string
-	if strings.HasPrefix(strings.ToLower(rest), strings.ToLower(cmdlet)+" ") || strings.EqualFold(rest, cmdlet) {
-		command = rest
-	} else {
-		command = cmdlet + " " + rest
+	command := strings.TrimSpace(strings.Join(args, " "))
+	parts := strings.Fields(command)
+	if len(parts) < 1 {
+		return fmt.Errorf("empty command")
 	}
+	cmdlet := parts[0]
 	slug := CommandSlug(cmdlet, command)
 
 	existing, _ := LoadCommand(cmdlet, slug)

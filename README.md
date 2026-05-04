@@ -86,10 +86,16 @@ command keeps its workdir, last-run status and a tail of its log. Commands can
 be run on demand, scheduled with cron, or composed into chains.
 
 ```bash
-moc maker                       # open interactive TUI
-moc maker git "git status"      # save under cmdlet "git"
-moc maker run git status        # run by slug
-moc maker schedule git status "*/15 * * * *"
+moc maker                          # open interactive TUI
+
+# any of these save+run under the cmdlet inferred from the first word:
+moc maker git status
+moc maker git branch -a
+moc maker "git log --oneline -20"  # paste a long command as a single string
+
+moc maker --add "git status"       # save only, don't run
+moc maker run git status           # run a previously saved command by slug
+moc maker schedule git status --cron "*/15 * * * *"
 ```
 
 Inside the TUI:
