@@ -372,7 +372,7 @@ func buildExecPreview(c *Command, lines []string) string {
 	b.WriteString("\n")
 	b.WriteString(makerPvTitleStyle.Render("  OUTPUT LOG") + "\n")
 	for _, l := range lines {
-		b.WriteString(makerPvDimStyle.Render("  "+truncateMaker(l, 46)) + "\n")
+		b.WriteString(makerPvDimStyle.Render("  "+l) + "\n")
 	}
 	return b.String()
 }
@@ -549,29 +549,34 @@ func (m makerModel) navigateToCmdlet(name string) (makerModel, tea.Cmd) {
 }
 
 func (m makerModel) doRunCommand(c *Command) (makerModel, tea.Cmd) {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", c.Command)
-	} else {
-		cmd = exec.Command("sh", "-c", c.Command)
-	}
-	if c.Workdir != "" {
-		cmd.Dir = c.Workdir
-	}
-	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+	m.statusMsg = "running: " + c.Command
+	m.isErr = false
+	cmdRef := c
+	run := func() tea.Msg {
+		var cmd *exec.Cmd
+		if runtime.GOOS == "windows" {
+			cmd = exec.Command("cmd", "/C", cmdRef.Command)
+		} else {
+			cmd = exec.Command("sh", "-c", cmdRef.Command)
+		}
+		if cmdRef.Workdir != "" {
+			cmd.Dir = cmdRef.Workdir
+		}
+		out, err := cmd.CombinedOutput()
 		status := "success"
 		if err != nil {
 			status = "failed"
 		}
 		now := time.Now()
-		c.LastRun = &now
-		c.LastStatus = status
-		SaveCommand(c)
-		logN := logName(c.Cmdlet, CommandSlug(c.Cmdlet, c.Command))
-		AppendLog(logN, strings.ToUpper(status), "", time.Now())
-		lines, _ := TailLog(logN, 20)
-		return makerRefreshMsg{logContent: buildExecPreview(c, lines)}
-	})
+		cmdRef.LastRun = &now
+		cmdRef.LastStatus = status
+		SaveCommand(cmdRef)
+		logN := logName(cmdRef.Cmdlet, CommandSlug(cmdRef.Cmdlet, cmdRef.Command))
+		AppendLog(logN, strings.ToUpper(status), string(out), time.Now())
+		lines, _ := TailLog(logN, 60)
+		return makerRefreshMsg{logContent: buildExecPreview(cmdRef, lines)}
+	}
+	return m, run
 }
 
 func (m makerModel) doDel() (makerModel, tea.Cmd) {
